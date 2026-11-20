@@ -1,0 +1,1110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidStringList(arr, maxItems, maxItemLen) {
+      return arr is list && arr.size() <= maxItems && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= maxItemLen));
+    }
+
+    function ownsSubject(subjectId) {
+      return isValidId(subjectId)
+        && exists(/databases/$(database)/documents/subjects/$(subjectId))
+        && get(/databases/$(database)/documents/subjects/$(subjectId)).data.ownerId == request.auth.uid;
+    }
+
+    function ownsSubjectOrGeneral(subjectId) {
+      return subjectId == 'general' || ownsSubject(subjectId);
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'email', 'photoURL',
+          'dailyGoalMinutes', 'streakDays', 'totalStudyMinutes',
+          'lastStudyDate', 'theme', 'achievements', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'displayName', 'email', 'photoURL',
+          'dailyGoalMinutes', 'streakDays', 'totalStudyMinutes',
+          'lastStudyDate', 'theme', 'achievements', 'createdAt', 'updatedAt'
+        ])
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && isValidString(data.displayName, 1, 120)
+        && isValidString(data.email, 3, 254)
+        && isValidString(data.photoURL, 0, 500)
+        && data.dailyGoalMinutes is number && data.dailyGoalMinutes >= 10 && data.dailyGoalMinutes <= 600
+        && data.streakDays is number && data.streakDays >= 0 && data.streakDays <= 10000
+        && data.totalStudyMinutes is number && data.totalStudyMinutes >= 0 && data.totalStudyMinutes <= 1000000
+        && isValidString(data.lastStudyDate, 0, 20)
+        && data.theme in ['light', 'dark']
+        && isValidStringList(data.achievements, 40, 64)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSubject(data) {
+      return data.keys().hasAll([
+          'ownerId', 'name', 'code', 'folder', 'color',
+          'examDate', 'confidence', 'targetHoursPerWeek', 'topics', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'name', 'code', 'folder', 'color',
+          'examDate', 'confidence', 'targetHoursPerWeek', 'topics', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidString(data.name, 1, 120)
+        && isValidString(data.code, 0, 32)
+        && isValidString(data.folder, 0, 80)
+        && data.color in ['indigo', 'blue', 'emerald', 'amber', 'rose', 'violet', 'slate']
+        && isValidString(data.examDate, 0, 20)
+        && data.confidence is number && data.confidence >= 1 && data.confidence <= 5
+        && data.targetHoursPerWeek is number && data.targetHoursPerWeek >= 1 && data.targetHoursPerWeek <= 80
+        && isValidStringList(data.topics, 40, 120)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidResource(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'fileName', 'fileType',
+          'fileSize', 'isPastPaper', 'extractedText', 'summary',
+          'keyConcepts', 'definitions', 'formulas', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'fileName', 'fileType',
+          'fileSize', 'isPastPaper', 'extractedText', 'summary',
+          'keyConcepts', 'definitions', 'formulas', 'detectedTopics', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && isValidString(data.fileName, 1, 255)
+        && data.fileType in ['pdf', 'docx', 'pptx', 'image', 'text', 'csv']
+        && data.fileSize is number && data.fileSize >= 0 && data.fileSize <= 52428800
+        && data.isPastPaper is bool
+        && isValidString(data.extractedText, 0, 200000)
+        && isValidString(data.summary, 0, 20000)
+        && isValidStringList(data.keyConcepts, 40, 200)
+        && isValidStringList(data.definitions, 50, 400)
+        && isValidStringList(data.formulas, 40, 300)
+        && (!('detectedTopics' in data) || isValidStringList(data.detectedTopics, 20, 120))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'resourceId', 'title', 'style',
+          'content', 'isBookmarked', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'resourceId', 'title', 'style',
+          'content', 'isBookmarked', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.resourceId, 0, 128)
+        && isValidString(data.title, 1, 200)
+        && data.style in ['quick', 'detailed', 'exam', 'personal']
+        && isValidString(data.content, 0, 200000)
+        && data.isBookmarked is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFlashcard(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'resourceId', 'front', 'back', 'hint',
+          'topic', 'difficulty', 'repetitions', 'intervalDays', 'easeFactor',
+          'nextReviewAt', 'timesReviewed', 'timesCorrect', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'resourceId', 'front', 'back', 'hint',
+          'topic', 'difficulty', 'repetitions', 'intervalDays', 'easeFactor',
+          'nextReviewAt', 'timesReviewed', 'timesCorrect', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.resourceId, 0, 128)
+        && isValidString(data.front, 1, 2000)
+        && isValidString(data.back, 1, 4000)
+        && isValidString(data.hint, 0, 1000)
+        && isValidString(data.topic, 0, 120)
+        && data.difficulty in ['easy', 'medium', 'hard']
+        && data.repetitions is number && data.repetitions >= 0 && data.repetitions <= 10000
+        && data.intervalDays is number && data.intervalDays >= 0 && data.intervalDays <= 3650
+        && data.easeFactor is number && data.easeFactor >= 1.1 && data.easeFactor <= 5.0
+        && isValidString(data.nextReviewAt, 1, 40)
+        && data.timesReviewed is number && data.timesReviewed >= 0 && data.timesReviewed <= 100000
+        && data.timesCorrect is number && data.timesCorrect >= 0 && data.timesCorrect <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidQuiz(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'difficulty', 'isTimed',
+          'durationMinutes', 'status', 'questions', 'answers', 'results',
+          'score', 'maxScore', 'weakTopics', 'aiSummary', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'difficulty', 'isTimed',
+          'durationMinutes', 'status', 'questions', 'answers', 'results',
+          'score', 'maxScore', 'weakTopics', 'aiSummary', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && data.difficulty in ['foundation', 'standard', 'advanced']
+        && data.isTimed is bool
+        && data.durationMinutes is number && data.durationMinutes >= 1 && data.durationMinutes <= 240
+        && data.status in ['in_progress', 'completed']
+        && data.questions is list && data.questions.size() >= 1 && data.questions.size() <= 30 && data.questions[0] is map
+        && data.answers is map
+        && data.results is list && data.results.size() <= 30 && (data.results.size() == 0 || data.results[0] is map)
+        && data.score is number && data.score >= 0 && data.score <= 1000
+        && data.maxScore is number && data.maxScore >= 1 && data.maxScore <= 1000
+        && isValidStringList(data.weakTopics, 30, 160)
+        && isValidString(data.aiSummary, 0, 10000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTutorMessage(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'role', 'mode', 'content', 'isBookmarked', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'role', 'mode', 'content', 'isBookmarked', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && data.role in ['user', 'model']
+        && data.mode in ['simple', 'step_by_step', 'example', 'test_me', 'explain_mistake', 'general']
+        && isValidString(data.content, 1, 60000)
+        && data.isBookmarked is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudyPlanTask(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'topic', 'scheduledDate', 'startTime',
+          'durationMinutes', 'priority', 'taskType', 'completed', 'missed', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'topic', 'scheduledDate', 'startTime',
+          'durationMinutes', 'priority', 'taskType', 'category', 'completed', 'missed', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && isValidString(data.topic, 0, 160)
+        && isValidString(data.scheduledDate, 8, 20)
+        && isValidString(data.startTime, 0, 20)
+        && data.durationMinutes is number && data.durationMinutes >= 5 && data.durationMinutes <= 480
+        && data.priority in ['high', 'medium', 'low']
+        && data.taskType in ['revision', 'flashcards', 'quiz', 'reading']
+        && (!('category' in data) || data.category in ['revision', 'exam', 'assignment', 'homework'])
+        && data.completed is bool
+        && data.missed is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudySession(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'activityType', 'durationMinutes', 'date', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'activityType', 'durationMinutes', 'date', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && data.activityType in ['focus', 'flashcards', 'quiz', 'notes', 'tutor', 'lesson']
+        && data.durationMinutes is number && data.durationMinutes >= 1 && data.durationMinutes <= 600
+        && isValidString(data.date, 8, 20)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAcademicMemory(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'completedTopics', 'strugglingTopics', 'preferredComplexity',
+          'learningNotes', 'recurringMistakes', 'weeklyReport',
+          'notificationPrefs', 'dashboardWidgets', 'recentSubjectIds', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'completedTopics', 'strugglingTopics', 'preferredComplexity',
+          'learningNotes', 'recurringMistakes', 'weeklyReport',
+          'notificationPrefs', 'dashboardWidgets', 'recentSubjectIds',
+          'aiPrivacyBlockedSubjectIds', 'preferredModelMode', 'xpPoints', 'activeBadge',
+          'savedExplanations', 'dailyHabits', 'createdAt', 'updatedAt'
+        ])
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && isValidStringList(data.completedTopics, 100, 160)
+        && isValidStringList(data.strugglingTopics, 100, 160)
+        && data.preferredComplexity in ['foundation', 'balanced', 'rigorous']
+        && isValidString(data.learningNotes, 0, 10000)
+        && isValidStringList(data.recurringMistakes, 50, 300)
+        && isValidString(data.weeklyReport, 0, 30000)
+        && data.notificationPrefs is map
+        && isValidStringList(data.dashboardWidgets, 20, 64)
+        && isValidStringList(data.recentSubjectIds, 10, 128)
+        && (!('aiPrivacyBlockedSubjectIds' in data) || isValidStringList(data.aiPrivacyBlockedSubjectIds, 60, 128))
+        && (!('preferredModelMode' in data) || data.preferredModelMode in ['auto', 'primary', 'fast'])
+        && (!('xpPoints' in data) || (data.xpPoints is number && data.xpPoints >= 0 && data.xpPoints <= 10000000))
+        && (!('activeBadge' in data) || isValidString(data.activeBadge, 0, 64))
+        && (!('savedExplanations' in data) || (data.savedExplanations is list && data.savedExplanations.size() <= 40))
+        && (!('dailyHabits' in data) || (data.dailyHabits is list && data.dailyHabits.size() <= 20))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMindMap(data) {
+      return data.keys().hasAll(['ownerId', 'subjectId', 'title', 'nodes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'subjectId', 'title', 'nodes', 'createdAt', 'updatedAt'])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && data.nodes is list && data.nodes.size() >= 1 && data.nodes.size() <= 80 && data.nodes[0] is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidHomeworkItem(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'questions', 'studentAnswers', 'aiFeedback', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'questions', 'studentAnswers', 'aiFeedback', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && data.questions is list && data.questions.size() >= 1 && data.questions.size() <= 25 && data.questions[0] is map
+        && data.studentAnswers is map
+        && data.aiFeedback is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVocabItem(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'language', 'term', 'translation',
+          'partOfSpeech', 'exampleSentence', 'mastery', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'language', 'term', 'translation',
+          'partOfSpeech', 'exampleSentence', 'mastery', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.language, 1, 60)
+        && isValidString(data.term, 1, 200)
+        && isValidString(data.translation, 1, 200)
+        && isValidString(data.partOfSpeech, 0, 60)
+        && isValidString(data.exampleSentence, 0, 500)
+        && data.mastery is number && data.mastery >= 0 && data.mastery <= 5
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidInteractiveModule(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'activityType', 'payload', 'bestScore', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'activityType', 'payload', 'bestScore', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && data.activityType in ['match', 'fill_gaps', 'equation_steps', 'timeline', 'diagram_label']
+        && data.payload is map
+        && data.bestScore is number && data.bestScore >= 0 && data.bestScore <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWhiteboardBoard(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'strokesJson', 'aiNotes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'strokesJson', 'snapshotDataUrl', 'aiNotes', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && isValidString(data.strokesJson, 0, 300000)
+        && (!('snapshotDataUrl' in data) || isValidString(data.snapshotDataUrl, 0, 250000))
+        && isValidString(data.aiNotes, 0, 50000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTextbook(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'topic', 'difficulty', 'chapters', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'topic', 'difficulty', 'chapters', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && isValidString(data.topic, 1, 200)
+        && data.difficulty in ['foundation', 'standard', 'advanced']
+        && data.chapters is list && data.chapters.size() >= 1 && data.chapters.size() <= 20 && data.chapters[0] is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMistakeEntry(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'topic', 'question', 'studentAnswer', 'correctAnswer',
+          'misconception', 'explanation', 'practiceQuestion', 'resolved', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'topic', 'question', 'studentAnswer', 'correctAnswer',
+          'misconception', 'explanation', 'practiceQuestion', 'resolved', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.topic, 1, 160)
+        && isValidString(data.question, 1, 4000)
+        && isValidString(data.studentAnswer, 0, 4000)
+        && isValidString(data.correctAnswer, 0, 4000)
+        && isValidString(data.misconception, 0, 2000)
+        && isValidString(data.explanation, 0, 10000)
+        && isValidString(data.practiceQuestion, 0, 4000)
+        && data.resolved is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudyRoom(data) {
+      return data.keys().hasAll([
+          'ownerId', 'name', 'subjectName', 'inviteCode', 'isPublic', 'memberIds',
+          'sharedNotes', 'sharedGoal', 'quizSessionJson', 'mindMapNodes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'name', 'subjectName', 'inviteCode', 'isPublic', 'memberIds',
+          'sharedNotes', 'sharedGoal', 'quizSessionJson', 'mindMapNodes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && isValidString(data.name, 1, 160)
+        && isValidString(data.subjectName, 1, 120)
+        && isValidString(data.inviteCode, 4, 24)
+        && data.isPublic is bool
+        && isValidStringList(data.memberIds, 40, 128)
+        && data.memberIds.size() >= 1
+        && isValidString(data.sharedNotes, 0, 100000)
+        && isValidString(data.sharedGoal, 0, 400)
+        && isValidString(data.quizSessionJson, 0, 60000)
+        && data.mindMapNodes is list && data.mindMapNodes.size() <= 60
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLessonSession(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'topic', 'stage', 'status', 'transcript',
+          'notesContent', 'score', 'durationMinutes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'topic', 'stage', 'status', 'transcript',
+          'notesContent', 'score', 'durationMinutes', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.topic, 1, 200)
+        && data.stage is number && data.stage >= 0 && data.stage <= 10
+        && data.status in ['active', 'paused', 'completed']
+        && data.transcript is list && data.transcript.size() <= 80
+        && isValidString(data.notesContent, 0, 100000)
+        && data.score is number && data.score >= 0 && data.score <= 100
+        && data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 600
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAiTelemetryLog(data) {
+      return data.keys().hasAll([
+          'ownerId', 'endpoint', 'modelUsed', 'status', 'promptTokens',
+          'outputTokens', 'durationMs', 'summary', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'endpoint', 'modelUsed', 'status', 'promptTokens',
+          'outputTokens', 'durationMs', 'summary', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidString(data.endpoint, 1, 120)
+        && isValidString(data.modelUsed, 1, 80)
+        && data.status in ['success', 'error']
+        && data.promptTokens is number && data.promptTokens >= 0 && data.promptTokens <= 10000000
+        && data.outputTokens is number && data.outputTokens >= 0 && data.outputTokens <= 10000000
+        && data.durationMs is number && data.durationMs >= 0 && data.durationMs <= 600000
+        && isValidString(data.summary, 0, 400)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudyPodcast(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'topic', 'hostStyle', 'turns',
+          'takeaways', 'estimatedMinutes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'topic', 'hostStyle', 'turns',
+          'takeaways', 'estimatedMinutes', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && isValidString(data.topic, 1, 200)
+        && data.hostStyle in ['conversational', 'exam_cram', 'deep_dive', 'debate_duo']
+        && data.turns is list && data.turns.size() >= 1 && data.turns.size() <= 40 && data.turns[0] is map
+        && isValidStringList(data.takeaways, 20, 400)
+        && data.estimatedMinutes is number && data.estimatedMinutes >= 1 && data.estimatedMinutes <= 60
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFeynmanSession(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'topic', 'explanationText', 'overallScore',
+          'scores', 'blindSpots', 'jargonFlags', 'followUpQuestions', 'refinedSummary', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'topic', 'explanationText', 'overallScore',
+          'scores', 'blindSpots', 'jargonFlags', 'followUpQuestions', 'refinedSummary', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.topic, 1, 200)
+        && isValidString(data.explanationText, 1, 30000)
+        && data.overallScore is number && data.overallScore >= 0 && data.overallScore <= 100
+        && data.scores is map
+        && isValidStringList(data.blindSpots, 20, 400)
+        && isValidStringList(data.jargonFlags, 20, 300)
+        && isValidStringList(data.followUpQuestions, 10, 500)
+        && isValidString(data.refinedSummary, 0, 15000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCitationEntry(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'authors', 'year', 'sourceType', 'url',
+          'inText', 'apa', 'mla', 'chicago', 'harvard', 'ieee', 'bibtex', 'annotation', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'authors', 'year', 'sourceType', 'url',
+          'inText', 'apa', 'mla', 'chicago', 'harvard', 'ieee', 'bibtex', 'annotation', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 300)
+        && isValidString(data.authors, 0, 300)
+        && isValidString(data.year, 0, 20)
+        && data.sourceType in ['article', 'book', 'website', 'paper', 'video']
+        && isValidString(data.url, 0, 600)
+        && isValidString(data.inText, 0, 200)
+        && isValidString(data.apa, 0, 1500)
+        && isValidString(data.mla, 0, 1500)
+        && isValidString(data.chicago, 0, 1500)
+        && isValidString(data.harvard, 0, 1500)
+        && isValidString(data.ieee, 0, 1500)
+        && isValidString(data.bibtex, 0, 2500)
+        && isValidString(data.annotation, 0, 4000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCheatSheet(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'title', 'layoutColumns', 'sections', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'title', 'layoutColumns', 'sections', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.title, 1, 200)
+        && data.layoutColumns in [2, 3]
+        && data.sections is list && data.sections.size() >= 1 && data.sections.size() <= 24 && data.sections[0] is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidGradeCourse(data) {
+      return data.keys().hasAll([
+          'ownerId', 'subjectId', 'courseName', 'code', 'credits', 'targetGradePercent',
+          'categories', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'subjectId', 'courseName', 'code', 'credits', 'targetGradePercent',
+          'categories', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && isValidId(data.subjectId)
+        && isValidString(data.courseName, 1, 160)
+        && isValidString(data.code, 0, 32)
+        && data.credits is number && data.credits >= 0.5 && data.credits <= 30
+        && data.targetGradePercent is number && data.targetGradePercent >= 1 && data.targetGradePercent <= 100
+        && data.categories is list && data.categories.size() <= 20 && (data.categories.size() == 0 || data.categories[0] is map)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if isVerified() && isValidId(userId) && request.auth.uid == userId
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(userId) && request.auth.uid == userId
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'dailyGoalMinutes', 'theme', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['streakDays', 'totalStudyMinutes', 'lastStudyDate', 'achievements', 'updatedAt'])
+        );
+      allow delete: if false;
+    }
+
+    match /subjects/{subjectId} {
+      allow get: if isSignedIn() && isValidId(subjectId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(subjectId)
+        && isValidSubject(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(subjectId)
+        && existing().ownerId == request.auth.uid
+        && isValidSubject(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'code', 'folder', 'color', 'examDate', 'confidence', 'targetHoursPerWeek', 'topics', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(subjectId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /resources/{resourceId} {
+      allow get: if isSignedIn() && isValidId(resourceId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(resourceId)
+        && isValidResource(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubject(incoming().subjectId);
+      allow update: if isVerified() && isValidId(resourceId)
+        && existing().ownerId == request.auth.uid
+        && isValidResource(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'isPastPaper', 'summary', 'keyConcepts', 'definitions', 'formulas', 'detectedTopics', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(resourceId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /notes/{noteId} {
+      allow get: if isSignedIn() && isValidId(noteId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(noteId)
+        && isValidNote(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(noteId)
+        && existing().ownerId == request.auth.uid
+        && isValidNote(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'style', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['isBookmarked', 'updatedAt'])
+        );
+      allow delete: if isVerified() && isValidId(noteId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /flashcards/{cardId} {
+      allow get: if isSignedIn() && isValidId(cardId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(cardId)
+        && isValidFlashcard(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubject(incoming().subjectId);
+      allow update: if isVerified() && isValidId(cardId)
+        && existing().ownerId == request.auth.uid
+        && isValidFlashcard(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'difficulty', 'repetitions', 'intervalDays', 'easeFactor',
+            'nextReviewAt', 'timesReviewed', 'timesCorrect', 'updatedAt'
+          ])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['front', 'back', 'hint', 'topic', 'updatedAt'])
+        );
+      allow delete: if isVerified() && isValidId(cardId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /quizzes/{quizId} {
+      allow get: if isSignedIn() && isValidId(quizId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(quizId)
+        && isValidQuiz(incoming())
+        && incoming().status == 'in_progress'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubject(incoming().subjectId);
+      allow update: if isVerified() && isValidId(quizId)
+        && existing().ownerId == request.auth.uid
+        && existing().status != 'completed'
+        && isValidQuiz(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            incoming().status == 'in_progress'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['answers', 'updatedAt'])
+          )
+          || (
+            incoming().status == 'completed'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'answers', 'results', 'score', 'weakTopics', 'aiSummary', 'status', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isVerified() && isValidId(quizId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /tutorMessages/{messageId} {
+      allow get: if isSignedIn() && isValidId(messageId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(messageId)
+        && isValidTutorMessage(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubject(incoming().subjectId);
+      allow update: if isVerified() && isValidId(messageId)
+        && existing().ownerId == request.auth.uid
+        && isValidTutorMessage(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['isBookmarked', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(messageId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /studyPlanTasks/{taskId} {
+      allow get: if isSignedIn() && isValidId(taskId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(taskId)
+        && isValidStudyPlanTask(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(taskId)
+        && existing().ownerId == request.auth.uid
+        && isValidStudyPlanTask(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'missed', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'topic', 'scheduledDate', 'startTime', 'durationMinutes', 'priority', 'taskType', 'category', 'missed', 'updatedAt'
+          ])
+        );
+      allow delete: if isVerified() && isValidId(taskId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /studySessions/{sessionId} {
+      allow get: if isSignedIn() && isValidId(sessionId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(sessionId)
+        && isValidStudySession(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if false;
+      allow delete: if isVerified() && isValidId(sessionId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /academicMemories/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if isVerified() && isValidId(userId) && request.auth.uid == userId
+        && isValidAcademicMemory(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(userId) && request.auth.uid == userId
+        && isValidAcademicMemory(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'completedTopics', 'strugglingTopics', 'preferredComplexity', 'learningNotes',
+          'recurringMistakes', 'weeklyReport', 'notificationPrefs', 'dashboardWidgets',
+          'recentSubjectIds', 'aiPrivacyBlockedSubjectIds', 'preferredModelMode',
+          'xpPoints', 'activeBadge', 'savedExplanations', 'dailyHabits', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    match /mindMaps/{mapId} {
+      allow get: if isSignedIn() && isValidId(mapId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(mapId)
+        && isValidMindMap(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(mapId)
+        && existing().ownerId == request.auth.uid
+        && isValidMindMap(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'nodes', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(mapId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /homeworkItems/{hwId} {
+      allow get: if isSignedIn() && isValidId(hwId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(hwId)
+        && isValidHomeworkItem(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(hwId)
+        && existing().ownerId == request.auth.uid
+        && isValidHomeworkItem(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['studentAnswers', 'aiFeedback', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(hwId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /vocabItems/{vocabId} {
+      allow get: if isSignedIn() && isValidId(vocabId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(vocabId)
+        && isValidVocabItem(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(vocabId)
+        && existing().ownerId == request.auth.uid
+        && isValidVocabItem(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['mastery', 'exampleSentence', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(vocabId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /interactiveModules/{modId} {
+      allow get: if isSignedIn() && isValidId(modId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(modId)
+        && isValidInteractiveModule(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubject(incoming().subjectId);
+      allow update: if isVerified() && isValidId(modId)
+        && existing().ownerId == request.auth.uid
+        && isValidInteractiveModule(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['bestScore', 'payload', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(modId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /whiteboards/{boardId} {
+      allow get: if isSignedIn() && isValidId(boardId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(boardId)
+        && isValidWhiteboardBoard(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(boardId)
+        && existing().ownerId == request.auth.uid
+        && isValidWhiteboardBoard(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'subjectId', 'strokesJson', 'snapshotDataUrl', 'aiNotes', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(boardId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /textbooks/{bookId} {
+      allow get: if isSignedIn() && isValidId(bookId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(bookId)
+        && isValidTextbook(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(bookId)
+        && existing().ownerId == request.auth.uid
+        && isValidTextbook(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'chapters', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(bookId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /mistakes/{mistakeId} {
+      allow get: if isSignedIn() && isValidId(mistakeId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(mistakeId)
+        && isValidMistakeEntry(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(mistakeId)
+        && existing().ownerId == request.auth.uid
+        && isValidMistakeEntry(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'misconception', 'explanation', 'practiceQuestion', 'resolved', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(mistakeId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /studyRooms/{roomId} {
+      allow get: if isSignedIn() && isValidId(roomId)
+        && (existing().ownerId == request.auth.uid || request.auth.uid in existing().memberIds || existing().isPublic == true);
+      allow list: if isSignedIn()
+        && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.memberIds || resource.data.isPublic == true);
+      allow create: if isVerified() && isValidId(roomId)
+        && isValidStudyRoom(incoming())
+        && incoming().ownerId == request.auth.uid
+        && request.auth.uid in incoming().memberIds
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(roomId)
+        && isValidStudyRoom(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            (existing().ownerId == request.auth.uid || request.auth.uid in existing().memberIds)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'isPublic', 'sharedNotes', 'sharedGoal', 'quizSessionJson', 'mindMapNodes', 'memberIds', 'updatedAt'
+            ])
+          )
+          || (
+            incoming().diff(existing()).affectedKeys().hasOnly(['memberIds', 'updatedAt'])
+            && request.auth.uid in incoming().memberIds
+          )
+        );
+      allow delete: if isVerified() && isValidId(roomId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /lessonSessions/{lessonId} {
+      allow get: if isSignedIn() && isValidId(lessonId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(lessonId)
+        && isValidLessonSession(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(lessonId)
+        && existing().ownerId == request.auth.uid
+        && isValidLessonSession(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'stage', 'status', 'transcript', 'notesContent', 'score', 'durationMinutes', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(lessonId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /aiTelemetryLogs/{logId} {
+      allow get: if isSignedIn() && isValidId(logId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(logId)
+        && isValidAiTelemetryLog(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if false;
+      allow delete: if isVerified() && isValidId(logId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /studyPodcasts/{podcastId} {
+      allow get: if isSignedIn() && isValidId(podcastId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(podcastId)
+        && isValidStudyPodcast(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(podcastId)
+        && existing().ownerId == request.auth.uid
+        && isValidStudyPodcast(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'turns', 'takeaways', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(podcastId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /feynmanSessions/{sessionId} {
+      allow get: if isSignedIn() && isValidId(sessionId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(sessionId)
+        && isValidFeynmanSession(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(sessionId)
+        && existing().ownerId == request.auth.uid
+        && isValidFeynmanSession(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'explanationText', 'overallScore', 'scores', 'blindSpots', 'jargonFlags',
+          'followUpQuestions', 'refinedSummary', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(sessionId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /citations/{citationId} {
+      allow get: if isSignedIn() && isValidId(citationId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(citationId)
+        && isValidCitationEntry(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(citationId)
+        && existing().ownerId == request.auth.uid
+        && isValidCitationEntry(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['annotation', 'url', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(citationId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /cheatSheets/{sheetId} {
+      allow get: if isSignedIn() && isValidId(sheetId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(sheetId)
+        && isValidCheatSheet(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(sheetId)
+        && existing().ownerId == request.auth.uid
+        && isValidCheatSheet(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'layoutColumns', 'sections', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(sheetId) && existing().ownerId == request.auth.uid;
+    }
+
+    match /gradeCourses/{courseId} {
+      allow get: if isSignedIn() && isValidId(courseId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(courseId)
+        && isValidGradeCourse(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ownsSubjectOrGeneral(incoming().subjectId);
+      allow update: if isVerified() && isValidId(courseId)
+        && existing().ownerId == request.auth.uid
+        && isValidGradeCourse(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().subjectId == existing().subjectId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'courseName', 'code', 'credits', 'targetGradePercent', 'categories', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(courseId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}

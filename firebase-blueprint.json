@@ -1,0 +1,828 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Student profile, goals, streak, and achievement metadata.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 254 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "dailyGoalMinutes": { "type": "number" },
+        "streakDays": { "type": "number" },
+        "totalStudyMinutes": { "type": "number" },
+        "lastStudyDate": { "type": "string", "maxLength": 20 },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "achievements": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email",
+        "photoURL",
+        "dailyGoalMinutes",
+        "streakDays",
+        "totalStudyMinutes",
+        "lastStudyDate",
+        "theme",
+        "achievements",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Subject study workspace with exam date, folder, confidence, and syllabus topics.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "code": { "type": "string", "maxLength": 32 },
+        "folder": { "type": "string", "maxLength": 80 },
+        "color": { "type": "string", "enum": ["indigo", "blue", "emerald", "amber", "rose", "violet", "slate"] },
+        "examDate": { "type": "string", "maxLength": 20 },
+        "confidence": { "type": "number" },
+        "targetHoursPerWeek": { "type": "number" },
+        "topics": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "code",
+        "folder",
+        "color",
+        "examDate",
+        "confidence",
+        "targetHoursPerWeek",
+        "topics",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyResource": {
+      "title": "StudyResource",
+      "description": "Uploaded study document or image with extracted text and Gemini analysis.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "fileName": { "type": "string", "maxLength": 255 },
+        "fileType": { "type": "string", "enum": ["pdf", "docx", "pptx", "image", "text", "csv"] },
+        "fileSize": { "type": "number" },
+        "isPastPaper": { "type": "boolean" },
+        "extractedText": { "type": "string", "maxLength": 200000 },
+        "summary": { "type": "string", "maxLength": 20000 },
+        "keyConcepts": { "type": "array" },
+        "definitions": { "type": "array" },
+        "formulas": { "type": "array" },
+        "detectedTopics": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "title",
+        "fileName",
+        "fileType",
+        "fileSize",
+        "isPastPaper",
+        "extractedText",
+        "summary",
+        "keyConcepts",
+        "definitions",
+        "formulas",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyNote": {
+      "title": "StudyNote",
+      "description": "AI-generated or personal revision note.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "resourceId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "style": { "type": "string", "enum": ["quick", "detailed", "exam", "personal"] },
+        "content": { "type": "string", "maxLength": 200000 },
+        "isBookmarked": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "resourceId",
+        "title",
+        "style",
+        "content",
+        "isBookmarked",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Flashcard": {
+      "title": "Flashcard",
+      "description": "Spaced-repetition smart flashcard generated from study resources.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "resourceId": { "type": "string", "maxLength": 128 },
+        "front": { "type": "string", "maxLength": 2000 },
+        "back": { "type": "string", "maxLength": 4000 },
+        "hint": { "type": "string", "maxLength": 1000 },
+        "topic": { "type": "string", "maxLength": 120 },
+        "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+        "repetitions": { "type": "number" },
+        "intervalDays": { "type": "number" },
+        "easeFactor": { "type": "number" },
+        "nextReviewAt": { "type": "string", "maxLength": 40 },
+        "timesReviewed": { "type": "number" },
+        "timesCorrect": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "resourceId",
+        "front",
+        "back",
+        "hint",
+        "topic",
+        "difficulty",
+        "repetitions",
+        "intervalDays",
+        "easeFactor",
+        "nextReviewAt",
+        "timesReviewed",
+        "timesCorrect",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "AI-generated quiz or timed exam with grading feedback and weak topic tracking.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "difficulty": { "type": "string", "enum": ["foundation", "standard", "advanced"] },
+        "isTimed": { "type": "boolean" },
+        "durationMinutes": { "type": "number" },
+        "status": { "type": "string", "enum": ["in_progress", "completed"] },
+        "questions": { "type": "array" },
+        "answers": { "type": "object" },
+        "results": { "type": "array" },
+        "score": { "type": "number" },
+        "maxScore": { "type": "number" },
+        "weakTopics": { "type": "array" },
+        "aiSummary": { "type": "string", "maxLength": 10000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "title",
+        "difficulty",
+        "isTimed",
+        "durationMinutes",
+        "status",
+        "questions",
+        "answers",
+        "results",
+        "score",
+        "maxScore",
+        "weakTopics",
+        "aiSummary",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TutorMessage": {
+      "title": "TutorMessage",
+      "description": "Subject-scoped personal AI tutor message with teaching mode and bookmark flag.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "mode": { "type": "string", "enum": ["simple", "step_by_step", "example", "test_me", "explain_mistake", "general"] },
+        "content": { "type": "string", "maxLength": 60000 },
+        "isBookmarked": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "role",
+        "mode",
+        "content",
+        "isBookmarked",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyPlanTask": {
+      "title": "StudyPlanTask",
+      "description": "Scheduled revision task in the smart study planner.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "scheduledDate": { "type": "string", "maxLength": 20 },
+        "startTime": { "type": "string", "maxLength": 20 },
+        "durationMinutes": { "type": "number" },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+        "taskType": { "type": "string", "enum": ["revision", "flashcards", "quiz", "reading"] },
+        "category": { "type": "string", "enum": ["revision", "exam", "assignment", "homework"] },
+        "completed": { "type": "boolean" },
+        "missed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "title",
+        "topic",
+        "scheduledDate",
+        "startTime",
+        "durationMinutes",
+        "priority",
+        "taskType",
+        "completed",
+        "missed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudySession": {
+      "title": "StudySession",
+      "description": "Logged study or Pomodoro session for streak and analytics tracking.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "activityType": { "type": "string", "enum": ["focus", "flashcards", "quiz", "notes", "tutor", "lesson"] },
+        "durationMinutes": { "type": "number" },
+        "date": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "activityType",
+        "durationMinutes",
+        "date",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AcademicMemory": {
+      "title": "AcademicMemory",
+      "description": "Structured personal academic memory, privacy/model settings, XP/badges, and AI weekly learning report.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "completedTopics": { "type": "array" },
+        "strugglingTopics": { "type": "array" },
+        "preferredComplexity": { "type": "string", "enum": ["foundation", "balanced", "rigorous"] },
+        "learningNotes": { "type": "string", "maxLength": 10000 },
+        "recurringMistakes": { "type": "array" },
+        "weeklyReport": { "type": "string", "maxLength": 30000 },
+        "notificationPrefs": { "type": "object" },
+        "dashboardWidgets": { "type": "array" },
+        "recentSubjectIds": { "type": "array" },
+        "aiPrivacyBlockedSubjectIds": { "type": "array" },
+        "preferredModelMode": { "type": "string", "enum": ["auto", "primary", "fast"] },
+        "xpPoints": { "type": "number" },
+        "activeBadge": { "type": "string", "maxLength": 64 },
+        "savedExplanations": { "type": "array" },
+        "dailyHabits": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "completedTopics",
+        "strugglingTopics",
+        "preferredComplexity",
+        "learningNotes",
+        "recurringMistakes",
+        "weeklyReport",
+        "notificationPrefs",
+        "dashboardWidgets",
+        "recentSubjectIds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MindMap": {
+      "title": "MindMap",
+      "description": "Interactive color-coded AI mind map and knowledge graph nodes.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "nodes": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "subjectId", "title", "nodes", "createdAt", "updatedAt"]
+    },
+    "HomeworkItem": {
+      "title": "HomeworkItem",
+      "description": "Worksheet recognition, step-by-step hints, answer checks, and similar practice.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "questions": { "type": "array" },
+        "studentAnswers": { "type": "object" },
+        "aiFeedback": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "subjectId", "title", "questions", "studentAnswers", "aiFeedback", "createdAt", "updatedAt"]
+    },
+    "VocabItem": {
+      "title": "VocabItem",
+      "description": "Language learning personal dictionary entry.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "language": { "type": "string", "maxLength": 60 },
+        "term": { "type": "string", "maxLength": 200 },
+        "translation": { "type": "string", "maxLength": 200 },
+        "partOfSpeech": { "type": "string", "maxLength": 60 },
+        "exampleSentence": { "type": "string", "maxLength": 500 },
+        "mastery": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "language",
+        "term",
+        "translation",
+        "partOfSpeech",
+        "exampleSentence",
+        "mastery",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InteractiveModule": {
+      "title": "InteractiveModule",
+      "description": "Saved interactive learning activity (match, fill-in-the-gap, equation steps, timeline, diagram).",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "activityType": { "type": "string", "enum": ["match", "fill_gaps", "equation_steps", "timeline", "diagram_label"] },
+        "payload": { "type": "object" },
+        "bestScore": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "subjectId", "title", "activityType", "payload", "bestScore", "createdAt", "updatedAt"]
+    },
+    "WhiteboardBoard": {
+      "title": "WhiteboardBoard",
+      "description": "Interactive digital whiteboard strokes and Gemini analysis notes per subject.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "strokesJson": { "type": "string", "maxLength": 300000 },
+        "snapshotDataUrl": { "type": "string", "maxLength": 250000 },
+        "aiNotes": { "type": "string", "maxLength": 50000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "subjectId", "title", "strokesJson", "aiNotes", "createdAt", "updatedAt"]
+    },
+    "Textbook": {
+      "title": "Textbook",
+      "description": "Personalized Gemini-authored textbook with chapters, worked examples, SVG illustrations, and chapter tests.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "difficulty": { "type": "string", "enum": ["foundation", "standard", "advanced"] },
+        "chapters": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "subjectId", "title", "topic", "difficulty", "chapters", "createdAt", "updatedAt"]
+    },
+    "MistakeEntry": {
+      "title": "MistakeEntry",
+      "description": "Dedicated mistake database item tracking misconceptions, explanations, and revision scheduling.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "question": { "type": "string", "maxLength": 4000 },
+        "studentAnswer": { "type": "string", "maxLength": 4000 },
+        "correctAnswer": { "type": "string", "maxLength": 4000 },
+        "misconception": { "type": "string", "maxLength": 2000 },
+        "explanation": { "type": "string", "maxLength": 10000 },
+        "practiceQuestion": { "type": "string", "maxLength": 4000 },
+        "resolved": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "topic",
+        "question",
+        "studentAnswer",
+        "correctAnswer",
+        "misconception",
+        "explanation",
+        "practiceQuestion",
+        "resolved",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyRoom": {
+      "title": "StudyRoom",
+      "description": "Collaborative real-time study room with shared notes, goals, quiz state, and mind map.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 160 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "inviteCode": { "type": "string", "maxLength": 24 },
+        "isPublic": { "type": "boolean" },
+        "memberIds": { "type": "array" },
+        "sharedNotes": { "type": "string", "maxLength": 100000 },
+        "sharedGoal": { "type": "string", "maxLength": 400 },
+        "quizSessionJson": { "type": "string", "maxLength": 60000 },
+        "mindMapNodes": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "subjectName",
+        "inviteCode",
+        "isPublic",
+        "memberIds",
+        "sharedNotes",
+        "sharedGoal",
+        "quizSessionJson",
+        "mindMapNodes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LessonSession": {
+      "title": "LessonSession",
+      "description": "AI Teacher Mode virtual classroom session with pause/resume transcript, notes, and knowledge check score.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "stage": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"] },
+        "transcript": { "type": "array" },
+        "notesContent": { "type": "string", "maxLength": 100000 },
+        "score": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "topic",
+        "stage",
+        "status",
+        "transcript",
+        "notesContent",
+        "score",
+        "durationMinutes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AiTelemetryLog": {
+      "title": "AiTelemetryLog",
+      "description": "Recorded Gemini API request telemetry, token usage, model routing, and status per user.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "endpoint": { "type": "string", "maxLength": 120 },
+        "modelUsed": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["success", "error"] },
+        "promptTokens": { "type": "number" },
+        "outputTokens": { "type": "number" },
+        "durationMs": { "type": "number" },
+        "summary": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "endpoint",
+        "modelUsed",
+        "status",
+        "promptTokens",
+        "outputTokens",
+        "durationMs",
+        "summary",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyPodcast": {
+      "title": "StudyPodcast",
+      "description": "Dual-speaker AI study podcast episode script with dialogue turns and key takeaways.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "hostStyle": { "type": "string", "enum": ["conversational", "exam_cram", "deep_dive", "debate_duo"] },
+        "turns": { "type": "array" },
+        "takeaways": { "type": "array" },
+        "estimatedMinutes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "title",
+        "topic",
+        "hostStyle",
+        "turns",
+        "takeaways",
+        "estimatedMinutes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FeynmanSession": {
+      "title": "FeynmanSession",
+      "description": "Feynman teach-back mastery evaluation with rubric scores, blind spots, and follow-up Q&A.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "explanationText": { "type": "string", "maxLength": 30000 },
+        "overallScore": { "type": "number" },
+        "scores": { "type": "object" },
+        "blindSpots": { "type": "array" },
+        "jargonFlags": { "type": "array" },
+        "followUpQuestions": { "type": "array" },
+        "refinedSummary": { "type": "string", "maxLength": 15000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "topic",
+        "explanationText",
+        "overallScore",
+        "scores",
+        "blindSpots",
+        "jargonFlags",
+        "followUpQuestions",
+        "refinedSummary",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CitationEntry": {
+      "title": "CitationEntry",
+      "description": "Formatted academic citation across APA, MLA, Chicago, Harvard, IEEE, and BibTeX with annotation.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 300 },
+        "authors": { "type": "string", "maxLength": 300 },
+        "year": { "type": "string", "maxLength": 20 },
+        "sourceType": { "type": "string", "enum": ["article", "book", "website", "paper", "video"] },
+        "url": { "type": "string", "maxLength": 600 },
+        "inText": { "type": "string", "maxLength": 200 },
+        "apa": { "type": "string", "maxLength": 1500 },
+        "mla": { "type": "string", "maxLength": 1500 },
+        "chicago": { "type": "string", "maxLength": 1500 },
+        "harvard": { "type": "string", "maxLength": 1500 },
+        "ieee": { "type": "string", "maxLength": 1500 },
+        "bibtex": { "type": "string", "maxLength": 2500 },
+        "annotation": { "type": "string", "maxLength": 4000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "title",
+        "authors",
+        "year",
+        "sourceType",
+        "url",
+        "inText",
+        "apa",
+        "mla",
+        "chicago",
+        "harvard",
+        "ieee",
+        "bibtex",
+        "annotation",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CheatSheet": {
+      "title": "CheatSheet",
+      "description": "High-density printable exam crib sheet and formula reference builder.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "layoutColumns": { "type": "number" },
+        "sections": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "title",
+        "layoutColumns",
+        "sections",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GradeCourse": {
+      "title": "GradeCourse",
+      "description": "Course GPA and weighted assessment calculator entry.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "courseName": { "type": "string", "maxLength": 160 },
+        "code": { "type": "string", "maxLength": 32 },
+        "credits": { "type": "number" },
+        "targetGradePercent": { "type": "number" },
+        "categories": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "subjectId",
+        "courseName",
+        "code",
+        "credits",
+        "targetGradePercent",
+        "categories",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and learning telemetry."
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Student subject workspaces."
+    },
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/StudyResource" },
+      "description": "Uploaded PDF, Word, PowerPoint, CSV, and image study resources."
+    },
+    "/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/StudyNote" },
+      "description": "AI-generated and personal study notes."
+    },
+    "/flashcards/{cardId}": {
+      "schema": { "$ref": "#/entities/Flashcard" },
+      "description": "Smart spaced-repetition flashcards."
+    },
+    "/quizzes/{quizId}": {
+      "schema": { "$ref": "#/entities/Quiz" },
+      "description": "AI-generated quizzes and timed exams."
+    },
+    "/tutorMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/TutorMessage" },
+      "description": "Subject-scoped personal AI tutor conversations."
+    },
+    "/studyPlanTasks/{taskId}": {
+      "schema": { "$ref": "#/entities/StudyPlanTask" },
+      "description": "Smart study planner schedule tasks."
+    },
+    "/studySessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/StudySession" },
+      "description": "Completed study and focus timer sessions."
+    },
+    "/academicMemories/{userId}": {
+      "schema": { "$ref": "#/entities/AcademicMemory" },
+      "description": "Structured personal academic memory, habits, and widget preferences."
+    },
+    "/mindMaps/{mapId}": {
+      "schema": { "$ref": "#/entities/MindMap" },
+      "description": "AI mind maps and knowledge graph visualizations."
+    },
+    "/homeworkItems/{hwId}": {
+      "schema": { "$ref": "#/entities/HomeworkItem" },
+      "description": "Smart homework worksheet items and AI guidance."
+    },
+    "/vocabItems/{vocabId}": {
+      "schema": { "$ref": "#/entities/VocabItem" },
+      "description": "AI Language Lab vocabulary dictionary items."
+    },
+    "/interactiveModules/{modId}": {
+      "schema": { "$ref": "#/entities/InteractiveModule" },
+      "description": "Interactive learning activities per subject."
+    },
+    "/whiteboards/{boardId}": {
+      "schema": { "$ref": "#/entities/WhiteboardBoard" },
+      "description": "Interactive AI whiteboards saved per subject."
+    },
+    "/textbooks/{bookId}": {
+      "schema": { "$ref": "#/entities/Textbook" },
+      "description": "Personalized Gemini-authored interactive textbooks."
+    },
+    "/mistakes/{mistakeId}": {
+      "schema": { "$ref": "#/entities/MistakeEntry" },
+      "description": "Tracked student mistakes, misconceptions, and targeted practice."
+    },
+    "/studyRooms/{roomId}": {
+      "schema": { "$ref": "#/entities/StudyRoom" },
+      "description": "Collaborative real-time study rooms."
+    },
+    "/lessonSessions/{lessonId}": {
+      "schema": { "$ref": "#/entities/LessonSession" },
+      "description": "AI Teacher Mode interactive lesson sessions and replays."
+    },
+    "/aiTelemetryLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AiTelemetryLog" },
+      "description": "Per-user Gemini API usage, token tracking, and task history."
+    },
+    "/studyPodcasts/{podcastId}": {
+      "schema": { "$ref": "#/entities/StudyPodcast" },
+      "description": "Dual-speaker AI study podcast episodes and transcripts."
+    },
+    "/feynmanSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/FeynmanSession" },
+      "description": "Feynman teach-back mastery assessments."
+    },
+    "/citations/{citationId}": {
+      "schema": { "$ref": "#/entities/CitationEntry" },
+      "description": "Saved multi-format academic citations and bibliography entries."
+    },
+    "/cheatSheets/{sheetId}": {
+      "schema": { "$ref": "#/entities/CheatSheet" },
+      "description": "Printable high-density exam crib sheets and formula sheets."
+    },
+    "/gradeCourses/{courseId}": {
+      "schema": { "$ref": "#/entities/GradeCourse" },
+      "description": "GPA, course weights, and final exam goal calculator records."
+    }
+  }
+}
