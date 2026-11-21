@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { signInWithPopup } from 'firebase/auth';
-import { ArrowRight, BookOpen, Brain, Calendar, CheckCircle2, Layers } from 'lucide-react';
+import { ArrowRight, BookOpen, Brain, Calendar, CheckCircle2, Layers, Moon, Sun } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
+import type { ThemeMode } from '../types';
 import heroStudyDeskImg from '../assets/images/hero_study_desk_1794946788869.jpg';
 
-export function AuthGate() {
+interface AuthGateProps {
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
+}
+
+export function AuthGate({ theme = 'light', onToggleTheme }: AuthGateProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,14 +47,36 @@ export function AuthGate() {
             Planner
           </a>
         </nav>
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={loading}
-          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium transition-colors whitespace-nowrap shrink-0"
-        >
-          {loading ? 'Signing in...' : 'Sign In'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {onToggleTheme && (
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors whitespace-nowrap"
+              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            >
+              {theme === 'light' ? (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden sm:inline">Dark</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Light</span>
+                </>
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium transition-colors whitespace-nowrap shrink-0"
+          >
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-10 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">

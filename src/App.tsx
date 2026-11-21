@@ -20,6 +20,7 @@ import {
   Compass,
   Download,
   FileAudio,
+  FileCheck2,
   FileEdit,
   FilePlus2,
   FileSpreadsheet,
@@ -29,6 +30,7 @@ import {
   Headphones,
   History,
   Languages,
+  Layers,
   LayoutDashboard,
   Lightbulb,
   Menu,
@@ -135,6 +137,25 @@ import { ExportCentreView } from './components/ExportCentreView';
 import { AcademicMemoryView } from './components/AcademicMemoryView';
 import { SettingsView } from './components/SettingsView';
 import { SubjectModal } from './components/SubjectModal';
+import { FlashcardsStudioView } from './components/FlashcardsStudioView';
+import { PdfSolverView } from './components/PdfSolverView';
+
+const THEME_STORAGE_KEY = 'lumina-theme';
+
+function getInitialTheme(): ThemeMode {
+  try {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+  } catch {
+    // Ignore storage access errors in restricted frames
+  }
+  return 'light';
+}
 
 interface SmartNotification {
   id: string;
@@ -180,7 +201,7 @@ function StudyPlatformShell() {
   const [quickTutorPrompt, setQuickTutorPrompt] = useState<string | undefined>(undefined);
   const [quickTutorSubjectId, setQuickTutorSubjectId] = useState<string | undefined>(undefined);
 
-  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
@@ -205,7 +226,14 @@ function StudyPlatformShell() {
           ensureUserProfile(user),
           ensureAcademicMemory(user.uid),
         ]);
-        setTheme(prof.theme || 'light');
+        try {
+          const localSaved = window.localStorage.getItem(THEME_STORAGE_KEY);
+          if (!localSaved && (prof.theme === 'light' || prof.theme === 'dark')) {
+            setTheme(prof.theme);
+          }
+        } catch {
+          // ignore
+        }
       }
     });
     return () => unsub();
@@ -213,6 +241,12 @@ function StudyPlatformShell() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.style.colorScheme = theme;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore storage errors
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -221,7 +255,6 @@ function StudyPlatformShell() {
     const unsubs = [
       subscribeUserProfile(uid, (prof) => {
         setProfile(prof);
-        if (prof?.theme) setTheme(prof.theme);
       }),
       subscribeAcademicMemory(uid, (mem) => setAcademicMemory(mem)),
       subscribeOwnerCollection<Subject>('subjects', uid, setSubjects),
@@ -427,6 +460,8 @@ function StudyPlatformShell() {
       title: 'Core',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'flashcards_studio', label: 'Flashcards Studio', icon: Layers },
+        { id: 'pdf_solver', label: 'PDF Worksheet Solver', icon: FileCheck2 },
         { id: 'tutor', label: 'AI Tutor', icon: MessageSquare },
         { id: 'voice_tutor', label: 'Voice Tutor', icon: Mic },
         { id: 'homework', label: 'Homework Help', icon: ClipboardCheck },
@@ -501,12 +536,19 @@ function StudyPlatformShell() {
   }
 
   if (!authUser) {
-    return <AuthGate />;
+    return (
+      <AuthGate
+        theme={theme}
+        onToggleTheme={() => void handleToggleTheme(theme === 'light' ? 'dark' : 'light')}
+      />
+    );
   }
 
   const sectionLabels: Record<AppSection, string> = {
     dashboard: 'Dashboard',
     workspace: `Workspace / ${activeSubject?.name || 'Subject'}`,
+    flashcards_studio: 'Interactive Flashcards Studio',
+    pdf_solver: 'In-Place PDF Worksheet Solver',
     tutor: 'Personal AI Tutor',
     voice_tutor: 'Real-Time AI Voice Tutor',
     teacher: 'AI Teacher Mode Classroom',
@@ -828,11 +870,33 @@ function StudyPlatformShell() {
                     type="button"
                     onClick={() => {
                       setQuickCreateOpen(false);
+                      setSection('flashcards_studio');
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2.5"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    Flashcards Studio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickCreateOpen(false);
+                      setSection('pdf_solver');
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2.5"
+                  >
+                    <FileCheck2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    Solve PDF Worksheet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickCreateOpen(false);
                       setSection('homework');
                     }}
                     className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2.5"
                   >
-                    <ClipboardCheck className="w-3.5 h-3.5 text-indigo-600" />
+                    <ClipboardCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                     Scan Homework Worksheet
                   </button>
                   <button
@@ -971,10 +1035,21 @@ function StudyPlatformShell() {
             <button
               type="button"
               onClick={() => void handleToggleTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Toggle theme"
+              className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors whitespace-nowrap"
+              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
             >
-              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              {theme === 'light' ? (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden md:inline">Dark</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden md:inline">Light</span>
+                </>
+              )}
             </button>
 
             <button
@@ -1056,6 +1131,19 @@ function StudyPlatformShell() {
               </button>
             </div>
           )}
+
+          {section === 'flashcards_studio' && (
+            <FlashcardsStudioView
+              uid={authUser.uid}
+              academicMemory={academicMemory}
+              subjects={subjects}
+              resources={resources}
+              notes={notes}
+              flashcards={flashcards}
+            />
+          )}
+
+          {section === 'pdf_solver' && <PdfSolverView subjects={subjects} />}
 
           {section === 'tutor' && (
             <GlobalTutorView

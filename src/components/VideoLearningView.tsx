@@ -207,7 +207,7 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        <div className="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">{error}</div>
       )}
 
       {storyboard && currentScene && (
@@ -223,7 +223,9 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
                   type="button"
                   onClick={() => setShowSubtitles((s) => !s)}
                   className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-                    showSubtitles ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300' : 'bg-slate-100 text-slate-600'
+                    showSubtitles
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   <Subtitles className="w-3.5 h-3.5" />
@@ -276,7 +278,7 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
                   type="button"
                   disabled={activeSlide === 0}
                   onClick={() => setActiveSlide((s) => Math.max(0, s - 1))}
-                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
                   aria-label="Previous slide"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -285,7 +287,7 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
                   type="button"
                   disabled={activeSlide >= storyboard.scenes.length - 1}
                   onClick={() => setActiveSlide((s) => Math.min(storyboard.scenes.length - 1, s + 1))}
-                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
                   aria-label="Next slide"
                 >
                   <ChevronRight className="w-4 h-4" />

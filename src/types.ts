@@ -539,9 +539,21 @@ export interface GradeCourse {
   updatedAt?: unknown;
 }
 
+export interface PdfSolvedAnswer {
+  id: string;
+  pageNumber: number;
+  questionLabel: string;
+  shortAnswer: string;
+  detailedExplanation: string;
+  answerBox: [number, number, number, number]; // [ymin, xmin, ymax, xmax] normalized 0-1000
+  hidden?: boolean;
+}
+
 export type AppSection =
   | 'dashboard'
   | 'workspace'
+  | 'flashcards_studio'
+  | 'pdf_solver'
   | 'tutor'
   | 'voice_tutor'
   | 'teacher'

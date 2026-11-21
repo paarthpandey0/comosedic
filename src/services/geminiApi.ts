@@ -12,6 +12,7 @@ import type {
   InteractiveActivityType,
   MindMapNode,
   NoteStyle,
+  PdfSolvedAnswer,
   PodcastStyle,
   PodcastTurn,
   PreferredModelMode,
@@ -943,5 +944,26 @@ export async function generateGradeStrategy(params: {
   });
   return handleJsonResponse(res);
 }
+
+export async function solvePdfWorksheet(params: {
+  file: File;
+  subjectName?: string;
+  pageCount?: number;
+}): Promise<{
+  worksheetTitle: string;
+  answers: PdfSolvedAnswer[];
+}> {
+  const form = new FormData();
+  form.append('file', params.file);
+  if (params.subjectName) form.append('subjectName', params.subjectName);
+  if (params.pageCount) form.append('pageCount', String(params.pageCount));
+
+  const res = await fetch('/api/solve-pdf', {
+    method: 'POST',
+    body: form,
+  });
+  return handleJsonResponse(res);
+}
+
 
 

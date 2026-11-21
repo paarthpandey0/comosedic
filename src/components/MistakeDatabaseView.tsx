@@ -234,8 +234,8 @@ export function MistakeDatabaseView({ uid, subjects, mistakes }: MistakeDatabase
         </button>
       </div>
 
-      {error && <div className="rounded-xl bg-rose-50 px-4 py-2.5 text-xs text-rose-700">{error}</div>}
-      {notice && <div className="rounded-xl bg-emerald-50 px-4 py-2.5 text-xs text-emerald-700">{notice}</div>}
+      {error && <div className="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 text-xs text-rose-700 dark:text-rose-300">{error}</div>}
+      {notice && <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2.5 text-xs text-emerald-700 dark:text-emerald-300">{notice}</div>}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">

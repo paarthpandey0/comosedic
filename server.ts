@@ -3512,6 +3512,161 @@ app.post('/api/control-centre/mode', (req: Request, res: Response) => {
   res.status(400).json({ error: 'Invalid model mode.' });
 });
 
+// 37. In-Place PDF Worksheet Solver (Structured JSON analysis — zero server-side PDF rendering)
+app.post('/api/solve-pdf', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const ai = getAiClient();
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'Please upload a PDF worksheet to solve.' });
+      return;
+    }
+
+    const isPdf =
+      file.mimetype === 'application/pdf' ||
+      file.originalname.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      res.status(400).json({ error: 'Only PDF files (.pdf) are supported by the PDF Worksheet Solver.' });
+      return;
+    }
+
+    const MAX_SOLVE_PDF_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_SOLVE_PDF_BYTES) {
+      res.status(400).json({
+        error: 'PDF exceeds the 10 MB limit. Please upload a smaller worksheet (max 10 MB and 15 pages).',
+      });
+      return;
+    }
+
+    const subjectHint = String(req.body?.subjectName || '').trim();
+    const pageCountHint = Number(req.body?.pageCount || 0);
+    if (pageCountHint > 15) {
+      res.status(400).json({
+        error: 'This worksheet has more than 15 pages. Please upload a PDF with 15 pages or fewer.',
+      });
+      return;
+    }
+
+    const prompt = `You are an expert teacher and examiner solving an uploaded PDF worksheet${subjectHint ? ` for ${subjectHint}` : ''}.
+Carefully inspect EVERY page of this PDF (1-indexed pageNumber).
+Find EVERY question, sub-question (e.g. 1a, 1b, 2, Question 3), fill-in-the-blank, equation, or problem on every page and solve it accurately.
+
+For each question return an item in the "answers" array:
+- pageNumber: 1-indexed integer page number where this question appears.
+- questionLabel: Short label matching the worksheet (e.g. "1a", "2", "Question 3", "Part B").
+- shortAnswer: A concise final answer (max 1-2 short lines, e.g. "x = 12", "B) Mitochondria", "4.5 m/s^2", "True") sized to fit cleanly inside the worksheet's blank space without overflowing. Prefer plain ASCII math notation (e.g. sqrt(2), pi, <=, >=, !=, ^2) when possible.
+- detailedExplanation: Complete, clear step-by-step solution showing formulas, reasoning, and verification for the appended Solution Key pages.
+- answerBox: Normalized [ymin, xmin, ymax, xmax] bounding box on a 0-1000 coordinate scale (0=top/left, 1000=bottom/right) pointing directly to the EMPTY blank line, answer box, or open whitespace immediately beside or below that question where a teacher would write the final answer in blue ink. Never overlap printed question text if open whitespace exists nearby. Ensure ymax > ymin + 20 and xmax > xmin + 80.`;
+
+    const response = await generateContentWithResilience(
+      ai,
+      {
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: file.buffer.toString('base64'),
+              },
+            },
+            { text: prompt },
+          ],
+        },
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              worksheetTitle: { type: Type.STRING },
+              answers: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    pageNumber: { type: Type.INTEGER },
+                    questionLabel: { type: Type.STRING },
+                    shortAnswer: { type: Type.STRING },
+                    detailedExplanation: { type: Type.STRING },
+                    answerBox: {
+                      type: Type.ARRAY,
+                      items: { type: Type.INTEGER },
+                    },
+                  },
+                  required: [
+                    'pageNumber',
+                    'questionLabel',
+                    'shortAnswer',
+                    'detailedExplanation',
+                    'answerBox',
+                  ],
+                },
+              },
+            },
+            required: ['worksheetTitle', 'answers'],
+          },
+        },
+      },
+      45000,
+      { endpoint: '/api/solve-pdf' }
+    );
+
+    const parsed = JSON.parse((response.text ?? '{}').trim()) as {
+      worksheetTitle?: string;
+      answers?: Array<{
+        pageNumber?: number;
+        questionLabel?: string;
+        shortAnswer?: string;
+        detailedExplanation?: string;
+        answerBox?: number[];
+      }>;
+    };
+
+    const rawAnswers = Array.isArray(parsed.answers) ? parsed.answers : [];
+    const answers = rawAnswers.slice(0, 120).map((item, idx) => {
+      const box = Array.isArray(item.answerBox) && item.answerBox.length >= 4
+        ? item.answerBox.map((n) => Math.max(0, Math.min(1000, Math.round(Number(n) || 0))))
+        : [120 + (idx % 8) * 95, 550, 175 + (idx % 8) * 95, 920];
+
+      let ymin = Math.min(box[0], box[2]);
+      let ymax = Math.max(box[0], box[2]);
+      let xmin = Math.min(box[1], box[3]);
+      let xmax = Math.max(box[1], box[3]);
+
+      if (ymax - ymin < 24) {
+        ymax = Math.min(990, ymin + 36);
+        ymin = Math.max(10, ymax - 36);
+      }
+      if (xmax - xmin < 80) {
+        xmax = Math.min(980, xmin + 180);
+        xmin = Math.max(20, xmax - 180);
+      }
+
+      const maxPage = pageCountHint > 0 ? pageCountHint : 15;
+      const pageNumber = Math.max(1, Math.min(maxPage, Math.round(Number(item.pageNumber) || 1)));
+
+      return {
+        id: `ans_${idx + 1}_${Date.now().toString(36)}`,
+        pageNumber,
+        questionLabel: String(item.questionLabel || `Q${idx + 1}`).trim().slice(0, 60),
+        shortAnswer: String(item.shortAnswer || '').trim().slice(0, 240),
+        detailedExplanation: String(item.detailedExplanation || '').trim().slice(0, 3000),
+        answerBox: [ymin, xmin, ymax, xmax] as [number, number, number, number],
+      };
+    });
+
+    res.json({
+      worksheetTitle: String(
+        parsed.worksheetTitle || file.originalname.replace(/\.pdf$/i, '')
+      ).slice(0, 160),
+      answers,
+    });
+  } catch (error) {
+    const formatted = formatGeminiError(error);
+    res.status(formatted.status).json({ error: formatted.message });
+  }
+});
+
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
 

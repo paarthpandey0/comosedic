@@ -6,6 +6,17 @@
     --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    --chart-tooltip-bg: #ffffff;
+    --chart-tooltip-border: #e2e8f0;
+    --chart-tooltip-text: #0f172a;
+    --chart-axis-text: #64748b;
+  }
+
+  .dark {
+    --chart-tooltip-bg: #1e2432;
+    --chart-tooltip-border: #334155;
+    --chart-tooltip-text: #f1f5f9;
+    --chart-axis-text: #94a3b8;
   }
 
   html {

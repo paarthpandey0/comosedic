@@ -397,7 +397,7 @@ export function AnalyticsView({
               <select
                 value={activePrepSubject?.id || ''}
                 onChange={(e) => setPrepSubjectId(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-slate-100"
               >
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -453,7 +453,7 @@ export function AnalyticsView({
             </div>
           )}
 
-          {prepError && <p className="text-xs text-rose-600">{prepError}</p>}
+          {prepError && <p className="text-xs text-rose-600 dark:text-rose-400">{prepError}</p>}
 
           {prepResult && (
             <div className="space-y-4 pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -560,14 +560,18 @@ export function AnalyticsView({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" vertical={false} />
-                <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 12, fill: 'var(--chart-axis-text)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--chart-axis-text)' }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{
                     borderRadius: '12px',
-                    border: '1px solid rgba(148,163,184,0.25)',
+                    backgroundColor: 'var(--chart-tooltip-bg)',
+                    border: '1px solid var(--chart-tooltip-border)',
+                    color: 'var(--chart-tooltip-text)',
                     fontSize: '12px',
                   }}
+                  itemStyle={{ color: 'var(--chart-tooltip-text)' }}
+                  labelStyle={{ color: 'var(--chart-tooltip-text)', fontWeight: 600 }}
                 />
                 <Bar dataKey="minutes" fill="#4F46E5" radius={[6, 6, 0, 0]} />
               </BarChart>
@@ -592,14 +596,18 @@ export function AnalyticsView({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={quizTrendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--chart-axis-text)' }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--chart-axis-text)' }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{
                       borderRadius: '12px',
-                      border: '1px solid rgba(148,163,184,0.25)',
+                      backgroundColor: 'var(--chart-tooltip-bg)',
+                      border: '1px solid var(--chart-tooltip-border)',
+                      color: 'var(--chart-tooltip-text)',
                       fontSize: '12px',
                     }}
+                    itemStyle={{ color: 'var(--chart-tooltip-text)' }}
+                    labelStyle={{ color: 'var(--chart-tooltip-text)', fontWeight: 600 }}
                   />
                   <Line
                     type="monotone"

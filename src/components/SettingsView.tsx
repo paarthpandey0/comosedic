@@ -106,8 +106,8 @@ export function SettingsView({ uid, profile, theme, onChangeTheme }: SettingsVie
               onClick={() => onChangeTheme('light')}
               className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-sm font-medium transition-colors ${
                 theme === 'light'
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200'
+                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
               <Sun className="w-4 h-4" />
