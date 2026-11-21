@@ -14,6 +14,7 @@ import {
   Calculator,
   Calendar,
   ChevronDown,
+  ChevronRight,
   ClipboardCheck,
   Clock,
   Command,
@@ -38,6 +39,8 @@ import {
   Mic,
   Moon,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenTool,
   Play,
   Plus,
@@ -202,6 +205,14 @@ function StudyPlatformShell() {
   const [quickTutorSubjectId, setQuickTutorSubjectId] = useState<string | undefined>(undefined);
 
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('lumina-sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [moreStudiosOpen, setMoreStudiosOpen] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
@@ -248,6 +259,14 @@ function StudyPlatformShell() {
       // ignore storage errors
     }
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('lumina-sidebar-collapsed', String(sidebarCollapsed));
+    } catch {
+      // ignore storage errors
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!authUser) return;
@@ -452,8 +471,19 @@ function StudyPlatformShell() {
     return alerts.filter((a) => !dismissedAlerts.includes(a.id));
   }, [academicMemory, subjects, flashcards, tasks, quizzes.length, sessions.length, dismissedAlerts]);
 
+  const moreStudioItems: Array<{ id: AppSection; label: string; icon: typeof LayoutDashboard }> = [
+    { id: 'whiteboard', label: 'AI Whiteboard', icon: PenTool },
+    { id: 'textbooks', label: 'Textbook Builder', icon: BookMarked },
+    { id: 'cheatsheets', label: 'Cheat-Sheet Builder', icon: FileSpreadsheet },
+    { id: 'video_studio', label: 'Video Storyboards', icon: Film },
+    { id: 'explain_studio', label: 'Explanation Studio', icon: Lightbulb },
+  ];
+
+  const isMoreStudioActive = moreStudioItems.some((item) => item.id === section);
+
   const navGroups: Array<{
     title: string;
+    hasMoreStudios?: boolean;
     items: Array<{ id: AppSection; label: string; icon: typeof LayoutDashboard }>;
   }> = [
     {
@@ -463,22 +493,18 @@ function StudyPlatformShell() {
         { id: 'flashcards_studio', label: 'Flashcards Studio', icon: Layers },
         { id: 'pdf_solver', label: 'PDF Worksheet Solver', icon: FileCheck2 },
         { id: 'tutor', label: 'AI Tutor', icon: MessageSquare },
-        { id: 'voice_tutor', label: 'Voice Tutor', icon: Mic },
-        { id: 'homework', label: 'Homework Help', icon: ClipboardCheck },
         { id: 'focus', label: 'Focus Timer', icon: Timer },
       ],
     },
     {
       title: 'Classroom & Studio',
+      hasMoreStudios: true,
       items: [
         { id: 'teacher', label: 'AI Teacher Mode', icon: GraduationCap },
-        { id: 'whiteboard', label: 'AI Whiteboard', icon: PenTool },
-        { id: 'textbooks', label: 'Textbook Builder', icon: BookMarked },
+        { id: 'voice_tutor', label: 'Voice Tutor', icon: Mic },
+        { id: 'homework', label: 'Homework Help', icon: ClipboardCheck },
         { id: 'podcasts', label: 'AI Study Podcasts', icon: Headphones },
         { id: 'lecture_notes', label: 'Lecture Transcriber', icon: FileAudio },
-        { id: 'cheatsheets', label: 'Cheat-Sheet Builder', icon: FileSpreadsheet },
-        { id: 'video_studio', label: 'Video Storyboards', icon: Film },
-        { id: 'explain_studio', label: 'Explanation Studio', icon: Lightbulb },
       ],
     },
     {
@@ -514,7 +540,10 @@ function StudyPlatformShell() {
     },
   ];
 
-  const allNavItems = useMemo(() => navGroups.flatMap((g) => g.items), []);
+  const allNavItems = useMemo(
+    () => [...navGroups.flatMap((g) => g.items), ...moreStudioItems],
+    []
+  );
 
   const commandResults = useMemo(() => {
     const q = commandQuery.trim().toLowerCase();
@@ -590,37 +619,70 @@ function StudyPlatformShell() {
       {/* Sidebar */}
       {!distractionFree && (
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#181D27] flex flex-col transition-transform duration-200 lg:static lg:translate-x-0 ${
-            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          className={`fixed inset-y-0 left-0 z-40 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#181D27] flex flex-col transition-all duration-200 lg:static lg:translate-x-0 shrink-0 ${
+            sidebarCollapsed ? 'w-64 lg:w-[72px]' : 'w-64'
+          } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
-          <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div
+            className={`py-4 border-b border-slate-200 dark:border-slate-800 flex items-center ${
+              sidebarCollapsed ? 'px-4 lg:px-3 justify-between lg:justify-center' : 'px-5 justify-between'
+            }`}
+          >
             <button
               type="button"
               onClick={() => {
                 setSection('dashboard');
                 setMobileMenuOpen(false);
               }}
-              className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap"
+              className={`font-display font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap ${
+                sidebarCollapsed ? 'text-lg lg:hidden' : 'text-lg'
+              }`}
             >
               Lumina Study
             </button>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className="lg:hidden p-1 text-slate-500"
-              aria-label="Close navigation"
-            >
-              <X className="w-4 h-4" />
-            </button>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed((c) => !c)}
+                className="hidden lg:inline-flex items-center justify-center p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {sidebarCollapsed ? (
+                  <PanelLeftOpen className="w-4 h-4" />
+                ) : (
+                  <PanelLeftClose className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="lg:hidden p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                aria-label="Close navigation"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+          <div
+            className={`flex-1 overflow-y-auto py-4 space-y-5 ${
+              sidebarCollapsed ? 'px-3 lg:px-2' : 'px-3'
+            }`}
+          >
             {navGroups.map((group) => (
               <div key={group.title} className="space-y-1">
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <p
+                  className={`px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 ${
+                    sidebarCollapsed ? 'lg:hidden' : ''
+                  }`}
+                >
                   {group.title}
                 </p>
+                {sidebarCollapsed && group.title !== 'Core' && (
+                  <div className="hidden lg:block mx-2 my-2 border-t border-slate-200/70 dark:border-slate-800" />
+                )}
                 <nav className="space-y-0.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
@@ -633,24 +695,104 @@ function StudyPlatformShell() {
                           setSection(item.id);
                           setMobileMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                        title={sidebarCollapsed ? item.label : undefined}
+                        className={`w-full flex items-center rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                          sidebarCollapsed
+                            ? 'gap-3 px-3 py-2 lg:justify-center lg:px-0 lg:py-2.5'
+                            : 'gap-3 px-3 py-2'
+                        } ${
                           active
                             ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                         }`}
                       >
                         <Icon className="w-4 h-4 shrink-0" />
-                        <span>{item.label}</span>
+                        <span className={sidebarCollapsed ? 'lg:hidden' : ''}>{item.label}</span>
                       </button>
                     );
                   })}
+
+                  {/* Collapsible 'More Studios' Accordion */}
+                  {group.hasMoreStudios && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (sidebarCollapsed) {
+                            setSidebarCollapsed(false);
+                            setMoreStudiosOpen(true);
+                          } else {
+                            setMoreStudiosOpen((o) => !o);
+                          }
+                        }}
+                        title={sidebarCollapsed ? 'More Studios' : undefined}
+                        aria-expanded={moreStudiosOpen || isMoreStudioActive}
+                        className={`w-full flex items-center rounded-xl text-xs font-semibold transition-colors whitespace-nowrap ${
+                          sidebarCollapsed
+                            ? 'justify-between px-3 py-2 lg:justify-center lg:px-0 lg:py-2.5'
+                            : 'justify-between px-3 py-2'
+                        } ${
+                          isMoreStudioActive
+                            ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/30'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <ChevronRight
+                            className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                              moreStudiosOpen || isMoreStudioActive ? 'rotate-90' : ''
+                            }`}
+                          />
+                          <span className={sidebarCollapsed ? 'lg:hidden' : ''}>More Studios</span>
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono tabular-nums text-slate-400 dark:text-slate-500 ${
+                            sidebarCollapsed ? 'lg:hidden' : ''
+                          }`}
+                        >
+                          {moreStudioItems.length}
+                        </span>
+                      </button>
+
+                      {(moreStudiosOpen || isMoreStudioActive) && (
+                        <div
+                          className={`mt-0.5 space-y-0.5 pl-3 border-l border-slate-200/80 dark:border-slate-800 ml-3.5 ${
+                            sidebarCollapsed ? 'lg:hidden' : ''
+                          }`}
+                        >
+                          {moreStudioItems.map((item) => {
+                            const Icon = item.icon;
+                            const active = section === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setSection(item.id);
+                                  setMobileMenuOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${
+                                  active
+                                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
+                                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                <span>{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </nav>
               </div>
             ))}
 
             {/* Recently Opened Workspaces */}
             {recentSubjects.length > 0 && (
-              <div className="space-y-1">
+              <div className={`space-y-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                 <p className="px-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   <Clock className="w-3 h-3" />
                   <span>Recent Workspaces</span>
@@ -679,7 +821,7 @@ function StudyPlatformShell() {
             )}
 
             {/* Subject Workspaces by Folder */}
-            <div className="space-y-2.5">
+            <div className={`space-y-2.5 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
               <div className="px-3 flex items-center justify-between">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Subjects
@@ -742,21 +884,28 @@ function StudyPlatformShell() {
           </div>
 
           {/* Sidebar Footer */}
-          <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-1">
+          <div className={`p-3 border-t border-slate-200 dark:border-slate-800 space-y-1 ${sidebarCollapsed ? 'lg:px-2' : ''}`}>
             <button
               type="button"
               onClick={() => {
                 setSection('settings');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              title={sidebarCollapsed ? profile?.displayName || 'Profile & Settings' : undefined}
+              className={`w-full flex items-center rounded-xl text-sm font-medium transition-colors ${
+                sidebarCollapsed
+                  ? 'gap-3 px-3 py-2 lg:justify-center lg:px-0 lg:py-2.5'
+                  : 'gap-3 px-3 py-2'
+              } ${
                 section === 'settings'
                   ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
               <Settings className="w-4 h-4 shrink-0" />
-              <span className="truncate">{profile?.displayName || 'Profile & Settings'}</span>
+              <span className={`truncate ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                {profile?.displayName || 'Profile & Settings'}
+              </span>
             </button>
           </div>
         </aside>

@@ -7,13 +7,13 @@ import {
   Circle,
   Eye,
   EyeOff,
+  FileCheck2,
   FileText,
   Flame,
   GripVertical,
   Layers,
   Loader2,
   MessageSquare,
-  Play,
   Plus,
   RefreshCw,
   SlidersHorizontal,
@@ -88,7 +88,7 @@ export function DashboardView({
   quizzes,
   tasks,
   sessions,
-  onStartStudying,
+  onStartStudying: _onStartStudying,
   onCreateSubject,
   onOpenSubject,
   onNavigate,
@@ -350,6 +350,10 @@ export function DashboardView({
   const goalMinutes = profile?.dailyGoalMinutes || 90;
   const goalPct = Math.min(100, Math.round((todayMinutes / goalMinutes) * 100));
   const totalHours = ((profile?.totalStudyMinutes || 0) / 60).toFixed(1);
+  const flashcardCaughtUpPct =
+    flashcards.length > 0
+      ? Math.max(0, Math.min(100, Math.round(((flashcards.length - dueFlashcards.length) / flashcards.length) * 100)))
+      : 0;
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -357,6 +361,11 @@ export function DashboardView({
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
   }, []);
+
+  const capitalizedFirstName = useMemo(() => {
+    const raw = profile?.displayName?.trim().split(/\s+/)[0] || 'Scholar';
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }, [profile?.displayName]);
 
   const renderWidget = (widgetId: string) => {
     if (widgetId === 'autopilot') {
@@ -367,7 +376,7 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('autopilot')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('autopilot')}
-          className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-white dark:bg-[#1A202C] p-6 space-y-4"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 border-t-2 border-t-indigo-500 dark:border-t-indigo-400 bg-white/85 dark:bg-[#1A202C]/85 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow p-6 space-y-4"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
@@ -472,11 +481,11 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('quick_tutor')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('quick_tutor')}
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-6"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 border-t-2 border-t-blue-500/80 dark:border-t-blue-400/75 bg-white/85 dark:bg-[#1A202C]/85 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow p-6"
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <GripVertical className="w-4 h-4 text-slate-300 cursor-grab shrink-0" />
+              <GripVertical className="w-4 h-4 text-slate-300 dark:text-slate-600 cursor-grab shrink-0" />
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                   Quick-Access AI Tutor
@@ -504,12 +513,12 @@ export function DashboardView({
               type="text"
               value={quickPrompt}
               onChange={(e) => setQuickPrompt(e.target.value)}
-              placeholder="Ask Gemini to explain a concept, walk through a problem, or quiz you..."
-              className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Ask a question or request a quick quiz..."
+              className="flex-1 min-w-0 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white text-sm font-medium transition-colors whitespace-nowrap"
+              className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white text-sm font-medium transition-colors whitespace-nowrap shrink-0"
             >
               Ask Tutor
             </button>
@@ -526,7 +535,7 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('today_plan')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('today_plan')}
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-6"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 border-t-2 border-t-emerald-500/75 dark:border-t-emerald-400/70 bg-white/85 dark:bg-[#1A202C]/85 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -620,7 +629,7 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('subject_progress')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('subject_progress')}
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-6"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#1A202C]/90 shadow-xs p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -685,7 +694,7 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('recommendations')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('recommendations')}
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-6"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 border-t-2 border-t-violet-500/75 dark:border-t-violet-400/70 bg-white/85 dark:bg-[#1A202C]/85 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow p-6"
         >
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
@@ -768,7 +777,7 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('upcoming_exams')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('upcoming_exams')}
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-6"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#1A202C]/90 shadow-xs p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -818,7 +827,7 @@ export function DashboardView({
           onDragStart={() => setDragWidgetId('recent_docs')}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => handleWidgetDrop('recent_docs')}
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-6"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#1A202C]/90 shadow-xs p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -882,12 +891,12 @@ export function DashboardView({
   const orderedRight = activeWidgets.filter((id) => !leftColIds.includes(id) && id !== 'metrics');
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-8">
       {/* Welcome Header & Primary CTA */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {greeting}, {profile?.displayName?.split(' ')[0] || 'Scholar'}
+            {greeting}, {capitalizedFirstName}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             {subjects.length === 0
@@ -899,7 +908,7 @@ export function DashboardView({
           <button
             type="button"
             onClick={() => setCustomizeOpen((o) => !o)}
-            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A202C] hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300"
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A202C] hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-2xs transition-colors"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Customize Widgets
@@ -907,18 +916,18 @@ export function DashboardView({
           <button
             type="button"
             onClick={onCreateSubject}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A202C] hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A202C] hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-2xs transition-colors whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             New Subject
           </button>
           <button
             type="button"
-            onClick={onStartStudying}
+            onClick={() => onNavigate('pdf_solver')}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
           >
-            <Play className="w-4 h-4 fill-current" />
-            Start Studying
+            <FileCheck2 className="w-4 h-4" />
+            Solve a PDF
           </button>
         </div>
       </div>
@@ -974,8 +983,8 @@ export function DashboardView({
 
       {/* 4-Column Metric Strip */}
       {activeWidgets.includes('metrics') && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 border-t-2 border-t-amber-400/80 dark:border-t-amber-400/70 bg-white/90 dark:bg-[#1A202C]/85 backdrop-blur-sm shadow-xs hover:shadow-sm transition-shadow p-5">
             <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
               <span>Daily Study Streak</span>
               <Flame className="w-4 h-4 text-amber-500" />
@@ -983,29 +992,47 @@ export function DashboardView({
             <p className="font-display text-2xl font-bold text-slate-900 dark:text-white mt-2 tabular-nums">
               {profile?.streakDays || 0} days
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
               {profile?.lastStudyDate === today ? 'Goal active today' : 'Complete a session today'}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-5">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 border-t-2 border-t-indigo-500/80 dark:border-t-indigo-400/75 bg-white/90 dark:bg-[#1A202C]/85 backdrop-blur-sm shadow-xs hover:shadow-sm transition-shadow p-5">
             <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
               <span>Today’s Study Goal</span>
               <Timer className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <p className="font-display text-2xl font-bold text-slate-900 dark:text-white mt-2 tabular-nums">
-              {todayMinutes} <span className="text-sm font-normal text-slate-500">/ {goalMinutes} min</span>
-            </p>
-            <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-2.5 overflow-hidden">
-              <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${goalPct}%` }} />
+            <div className="flex items-baseline justify-between gap-2 mt-2">
+              <p className="font-display text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
+                {todayMinutes}{' '}
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                  / {goalMinutes} min
+                </span>
+              </p>
+              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 tabular-nums">
+                {goalPct}%
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 tabular-nums">
-              {studyTimeDelta >= 0 ? `+${studyTimeDelta}m vs yesterday` : `${studyTimeDelta}m vs yesterday`} · Suggested block:{' '}
+            <div
+              className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800/90 mt-3 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={goalPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Daily study goal progress"
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 dark:from-indigo-500 dark:to-indigo-400 transition-all duration-500"
+                style={{ width: `${goalPct}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
+              {studyTimeDelta >= 0 ? `+${studyTimeDelta}m vs yesterday` : `${studyTimeDelta}m vs yesterday`} · Suggested:{' '}
               {Math.max(25, Math.min(60, goalMinutes - todayMinutes || 25))}m
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-5">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 border-t-2 border-t-blue-500/75 dark:border-t-blue-400/70 bg-white/90 dark:bg-[#1A202C]/85 backdrop-blur-sm shadow-xs hover:shadow-sm transition-shadow p-5">
             <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
               <span>Total Study Time</span>
               <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -1013,21 +1040,61 @@ export function DashboardView({
             <p className="font-display text-2xl font-bold text-slate-900 dark:text-white mt-2 tabular-nums">
               {totalHours} hrs
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 tabular-nums">
               {sessions.length} logged sessions
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] p-5">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => onNavigate('flashcards_studio')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onNavigate('flashcards_studio');
+              }
+            }}
+            className="rounded-2xl border border-slate-200/80 dark:border-slate-800 border-t-2 border-t-violet-500/80 dark:border-t-violet-400/75 bg-white/90 dark:bg-[#1A202C]/85 backdrop-blur-sm shadow-xs hover:shadow-sm transition-shadow p-5 cursor-pointer text-left"
+          >
             <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
               <span>Flashcards Due</span>
               <Layers className="w-4 h-4 text-violet-600 dark:text-violet-400" />
             </div>
-            <p className="font-display text-2xl font-bold text-slate-900 dark:text-white mt-2 tabular-nums">
-              {dueFlashcards.length}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
-              Out of {flashcards.length} total cards
+            <div className="flex items-baseline justify-between gap-2 mt-2">
+              <p className="font-display text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
+                {dueFlashcards.length}{' '}
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                  / {flashcards.length}
+                </span>
+              </p>
+              <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 tabular-nums">
+                {flashcards.length > 0 ? `${flashcardCaughtUpPct}% caught up` : '0 cards'}
+              </span>
+            </div>
+            <div
+              className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800/90 mt-3 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={flashcardCaughtUpPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Flashcard review progress"
+            >
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  flashcards.length > 0 && dueFlashcards.length === 0
+                    ? 'bg-emerald-500 dark:bg-emerald-400'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-500 dark:from-violet-500 dark:to-indigo-400'
+                }`}
+                style={{ width: `${flashcardCaughtUpPct}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
+              {flashcards.length === 0
+                ? 'Open Flashcards Studio to create a deck'
+                : dueFlashcards.length === 0
+                  ? 'All scheduled reviews complete'
+                  : `${dueFlashcards.length} card${dueFlashcards.length === 1 ? '' : 's'} ready for review`}
             </p>
           </div>
         </div>
@@ -1035,7 +1102,7 @@ export function DashboardView({
 
       {/* Onboarding Empty State if no subjects */}
       {subjects.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1A202C] shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12">
           <div className="lg:col-span-7 p-8 flex flex-col justify-center">
             <h2 className="font-display text-xl font-semibold text-slate-900 dark:text-white mb-2">
               Build your first subject workspace
@@ -1064,9 +1131,9 @@ export function DashboardView({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 space-y-6">{orderedLeft.map((id) => renderWidget(id))}</div>
-          <div className="lg:col-span-5 space-y-6">{orderedRight.map((id) => renderWidget(id))}</div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
+          <div className="lg:col-span-7 space-y-7">{orderedLeft.map((id) => renderWidget(id))}</div>
+          <div className="lg:col-span-5 space-y-7">{orderedRight.map((id) => renderWidget(id))}</div>
         </div>
       )}
     </div>
