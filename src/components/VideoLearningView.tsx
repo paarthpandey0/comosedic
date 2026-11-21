@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,12 +8,14 @@ import {
   Loader2,
   Play,
   Sparkles,
+  Square,
   Subtitles,
   Volume2,
 } from 'lucide-react';
 import type { AcademicMemory, StudyResource, Subject } from '../types';
 import { buildSubjectAiContext } from '../services/studyDb';
-import { generateVideoStoryboard, synthesizeSpeechTts } from '../services/geminiApi';
+import { generateVideoStoryboard } from '../services/geminiApi';
+import { speakBrowserText, stopBrowserSpeech } from '../utils/browserSpeech';
 import { sanitizeSvgMarkup } from '../utils/safeSvg';
 import { MarkdownView } from './MarkdownView';
 
@@ -50,7 +52,12 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
   } | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [showSubtitles, setShowSubtitles] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    stopBrowserSpeech();
+    setSpeaking(false);
+    return () => stopBrowserSpeech();
+  }, [activeSlide, storyboard]);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -85,22 +92,25 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
 
   const handleNarrateSlide = async () => {
     if (!currentScene) return;
+    if (speaking) {
+      stopBrowserSpeech();
+      setSpeaking(false);
+      return;
+    }
     setSpeaking(true);
     setError('');
     try {
-      const res = await synthesizeSpeechTts({
+      await speakBrowserText({
         text: currentScene.narration,
-        style: 'Engaging, clear educational presenter',
-        voiceName: 'Kore',
+        rate: 1,
+        onEnd: () => setSpeaking(false),
+        onError: (msg) => {
+          setError(msg);
+          setSpeaking(false);
+        },
       });
-      const audioUrl = `data:${res.mimeType};base64,${res.audioBase64}`;
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        await audioRef.current.play();
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Narration playback failed.');
-    } finally {
       setSpeaking(false);
     }
   };
@@ -134,8 +144,6 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
 
   return (
     <div className="space-y-6">
-      <audio ref={audioRef} className="hidden" />
-
       <div>
         <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
           <Film className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
@@ -150,7 +158,7 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-4 py-3 flex items-start gap-3">
         <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
         <p className="text-xs text-slate-600 dark:text-slate-300">
-          Direct MP4 video synthesis requires a paid/external video model, which is not enabled on the current free-tier setup. All script generation, SVG diagram storyboards, Gemini TTS narration audio, and SRT subtitles run live.
+          Direct MP4 video synthesis requires a paid/external video model, which is not enabled on the current free-tier setup. All script generation, SVG diagram storyboards, browser speech narration, and SRT subtitles run live.
         </p>
       </div>
 
@@ -286,12 +294,11 @@ export function VideoLearningView({ subjects, resources, academicMemory }: Video
 
               <button
                 type="button"
-                disabled={speaking}
                 onClick={() => void handleNarrateSlide()}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
               >
-                {speaking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Volume2 className="w-3.5 h-3.5" />}
-                Narrate Slide Audio
+                {speaking ? <Square className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                {speaking ? 'Stop Narration' : 'Narrate Slide Audio'}
               </button>
             </div>
           </div>

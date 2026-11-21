@@ -10,7 +10,7 @@ import {
   Waves,
 } from 'lucide-react';
 import type { StudyResource, Subject } from '../types';
-import { synthesizeSpeechTts } from '../services/geminiApi';
+import { speakBrowserText, stopBrowserSpeech } from '../utils/browserSpeech';
 
 interface VoiceTutorViewProps {
   subjects: Subject[];
@@ -308,16 +308,22 @@ export function VoiceTutorView({ subjects, resources }: VoiceTutorViewProps) {
   };
 
   const handleReplayTurnTts = async (turn: TranscriptTurn) => {
+    if (ttsLoadingId === turn.id) {
+      stopBrowserSpeech();
+      setTtsLoadingId(null);
+      return;
+    }
     setTtsLoadingId(turn.id);
     try {
-      const res = await synthesizeSpeechTts({ text: turn.text, voiceName });
-      const audio = new Audio(`data:${res.mimeType};base64,${res.audioBase64}`);
-      audio.playbackRate = playbackSpeed;
-      await audio.play();
+      await speakBrowserText({
+        text: turn.text,
+        lang: mode === 'pronunciation' && language ? language : 'en-US',
+        rate: playbackSpeed,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not synthesize spoken replay.');
+      setError(err instanceof Error ? err.message : 'Could not replay spoken turn.');
     } finally {
-      setTtsLoadingId(null);
+      setTtsLoadingId((curr) => (curr === turn.id ? null : curr));
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BookmarkPlus,
   CheckCircle2,
@@ -13,8 +13,8 @@ import type { Subject, VocabItem } from '../types';
 import {
   checkLanguageExercise,
   generateLanguageLab,
-  synthesizeSpeechTts,
 } from '../services/geminiApi';
+import { speakBrowserText, stopBrowserSpeech } from '../utils/browserSpeech';
 import {
   createVocabItemsBatch,
   deleteVocabItem,
@@ -91,22 +91,29 @@ export function LanguageLabView({ uid, subjects, vocabItems }: LanguageLabViewPr
     }
   };
 
+  useEffect(() => {
+    return () => stopBrowserSpeech();
+  }, []);
+
   const handleSpeak = async (text: string) => {
+    if (speakingText === text) {
+      stopBrowserSpeech();
+      setSpeakingText(null);
+      return;
+    }
     setSpeakingText(text);
     setError(null);
     try {
-      const res = await synthesizeSpeechTts({
+      await speakBrowserText({
         text,
-        style: `Clear, natural native ${language} pronunciation`,
-        voiceName: 'Kore',
+        lang: language,
+        rate: speed,
+        onEnd: () => setSpeakingText((curr) => (curr === text ? null : curr)),
       });
-      const audio = new Audio(`data:${res.mimeType};base64,${res.audioBase64}`);
-      audio.playbackRate = speed;
-      await audio.play();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Audio playback failed.');
     } finally {
-      setSpeakingText(null);
+      setSpeakingText((curr) => (curr === text ? null : curr));
     }
   };
 

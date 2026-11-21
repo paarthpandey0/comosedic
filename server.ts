@@ -22,8 +22,6 @@ const PORT = 3000;
 const MODEL_NAME = 'gemini-4-hydrogen';
 const FALLBACK_MODEL_NAME = 'gemini-3.1-flash-lite';
 const LIVE_MODEL_NAME = 'gemini-3.8-live';
-const TTS_MODEL_NAME = 'gemini-3.8-flash-lite-tts';
-const PODCAST_TTS_MODEL_NAME = 'gemini-3.8-flash-tts';
 const TRANSCRIBE_MODEL_NAME = 'gemini-3.5-transcribe';
 
 let primaryModelCooldownUntil = 0;
@@ -322,26 +320,6 @@ async function* generateContentStreamWithResilience(
         }
         throw err;
       }
-    }
-  }
-  throw lastError;
-}
-
-async function generateTtsWithResilience(
-  ai: GoogleGenAI,
-  params: Parameters<GoogleGenAI['models']['generateContent']>[0]
-) {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      return await ai.models.generateContent(params);
-    } catch (err) {
-      lastError = err;
-      if (isTransientGeminiError(err) && attempt < 2) {
-        await sleep(500 * (attempt + 1));
-        continue;
-      }
-      throw err;
     }
   }
   throw lastError;
@@ -1943,55 +1921,24 @@ Provide a crystal-clear, structured Markdown response tailored specifically to $
   }
 });
 
-// 17. Gemini Text-to-Speech (TTS) for Spoken Explanations & Language Pronunciation
-app.post('/api/tts', async (req: Request, res: Response) => {
-  try {
-    const ai = getAiClient();
-    const { text, style = 'Clear, articulate academic tutor', voiceName = 'Kore' } = req.body as {
-      text: string;
-      style?: string;
-      voiceName?: string;
-    };
+// 17. Standard Text-to-Speech Endpoint (delegates playback to browser speechSynthesis; real-time voice uses /ws/voice-tutor Live API)
+app.post('/api/tts', (req: Request, res: Response) => {
+  const { text = '', lang = 'en-US' } = req.body as {
+    text?: string;
+    lang?: string;
+  };
 
-    if (!text || !text.trim()) {
-      res.status(400).json({ error: 'Text is required for speech synthesis.' });
-      return;
-    }
-
-    const response = await generateTtsWithResilience(ai, {
-      model: TTS_MODEL_NAME,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: text.slice(0, 2500),
-              speechMetadata: { style },
-            },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName },
-          },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
-      res.status(500).json({ error: 'No audio data returned from Gemini TTS.' });
-      return;
-    }
-
-    res.json({ audioBase64: base64Audio, mimeType: 'audio/wav' });
-  } catch (error) {
-    const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+  if (!text || !text.trim()) {
+    res.status(400).json({ error: 'Text is required for speech synthesis.' });
+    return;
   }
+
+  res.json({
+    mode: 'browser_speech',
+    text: text.trim().slice(0, 4000),
+    lang,
+    message: 'Standard text-to-speech uses browser speechSynthesis. Use /ws/voice-tutor for Gemini Live API audio.',
+  });
 });
 
 // 18. AI Teacher Mode Virtual Classroom
@@ -2770,134 +2717,30 @@ Return 10 to 14 alternating dialogue turns (each 1-3 crisp spoken sentences so i
   }
 });
 
-// 30. Dual-Speaker Study Podcast Audio Synthesis (gemini-3.8-flash-tts)
-app.post('/api/podcasts/audio', async (req: Request, res: Response) => {
-  try {
-    const ai = getAiClient();
-    const { turns = [] } = req.body as {
-      turns?: Array<{ speaker: 'Alex' | 'Sam'; line: string }>;
-    };
+// 30. Study Podcast Dialogue Playback Payload (uses browser speechSynthesis on client without invalid generateContent speech fields)
+app.post('/api/podcasts/audio', (req: Request, res: Response) => {
+  const { turns = [] } = req.body as {
+    turns?: Array<{ speaker: 'Alex' | 'Sam'; line: string }>;
+  };
 
-    const cleanTurns = turns
-      .filter((t) => t && typeof t.line === 'string' && t.line.trim().length > 0)
-      .slice(0, 16);
+  const cleanTurns = turns
+    .filter((t) => t && typeof t.line === 'string' && t.line.trim().length > 0)
+    .slice(0, 20)
+    .map((t) => ({
+      speaker: t.speaker === 'Sam' ? 'Sam' : 'Alex',
+      line: t.line.trim().slice(0, 800),
+    }));
 
-    if (cleanTurns.length === 0) {
-      res.status(400).json({ error: 'No dialogue turns available to synthesize.' });
-      return;
-    }
-
-    const startedAt = Date.now();
-    try {
-      const multiParts = cleanTurns.map((t) => ({
-        text: `${t.speaker}: ${t.line.trim().slice(0, 500)}`,
-        speechMetadata: {
-          speaker: t.speaker,
-          style:
-            t.speaker === 'Alex'
-              ? 'Enthusiastic, bright study podcast host'
-              : 'Curious, articulate analytical co-host',
-        },
-      }));
-
-      const response = await ai.models.generateContent({
-        model: PODCAST_TTS_MODEL_NAME,
-        contents: [
-          {
-            role: 'user',
-            parts: multiParts as never,
-          },
-        ],
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            multiSpeakerVoiceConfig: {
-              speakerVoiceConfigs: [
-                {
-                  speaker: 'Alex',
-                  voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } },
-                },
-                {
-                  speaker: 'Sam',
-                  voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-                },
-              ],
-            },
-          },
-          abortSignal: AbortSignal.timeout(45000),
-        },
-      });
-
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!base64Audio) {
-        throw new Error('Dual-speaker audio stream returned empty audio.');
-      }
-
-      recordServerTelemetry({
-        endpoint: '/api/podcasts/audio',
-        modelUsed: PODCAST_TTS_MODEL_NAME,
-        status: 'success',
-        promptTokens: 0,
-        outputTokens: 0,
-        durationMs: Date.now() - startedAt,
-        summary: `Synthesized dual-host WAV (${cleanTurns.length} turns)`,
-      });
-
-      res.json({
-        audioBase64: base64Audio,
-        mimeType: 'audio/wav',
-        modelUsed: PODCAST_TTS_MODEL_NAME,
-      });
-      return;
-    } catch (multiErr) {
-      console.warn('[Podcast TTS] Falling back to single-speaker narration:', multiErr instanceof Error ? multiErr.message : String(multiErr));
-      const combinedScript = cleanTurns
-        .map((t) => `${t.speaker} says: ${t.line.trim()}`)
-        .join(' ')
-        .slice(0, 4200);
-      const fallbackRes = await generateTtsWithResilience(ai, {
-        model: TTS_MODEL_NAME,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: combinedScript,
-                speechMetadata: { style: 'Warm, clear educational podcast narrator' },
-              } as never,
-            ],
-          },
-        ],
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-          },
-        },
-      });
-      const fallbackAudio = fallbackRes.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!fallbackAudio) {
-        throw multiErr;
-      }
-      recordServerTelemetry({
-        endpoint: '/api/podcasts/audio',
-        modelUsed: TTS_MODEL_NAME,
-        status: 'success',
-        promptTokens: 0,
-        outputTokens: 0,
-        durationMs: Date.now() - startedAt,
-        summary: 'Synthesized single-host fallback WAV',
-      });
-      res.json({
-        audioBase64: fallbackAudio,
-        mimeType: 'audio/wav',
-        modelUsed: TTS_MODEL_NAME,
-      });
-    }
-  } catch (error) {
-    const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+  if (cleanTurns.length === 0) {
+    res.status(400).json({ error: 'No dialogue turns available to play.' });
+    return;
   }
+
+  res.json({
+    mode: 'browser_speech',
+    turns: cleanTurns,
+    modelUsed: 'Browser Web Speech Synthesis',
+  });
 });
 
 // 31. Lecture Audio Transcription (gemini-3.5-transcribe) & Cornell Notes Generator
@@ -3621,20 +3464,12 @@ app.get('/api/control-centre/status', (_req: Request, res: Response) => {
         capabilities: ['Low-Latency Audio Stream', 'Interruptible Speech', 'Pronunciation Coaching'],
       },
       {
-        id: TTS_MODEL_NAME,
-        role: 'Neural Single-Speaker Text-to-Speech Engine',
-        connected: hasApiKey,
+        id: 'browser-speech-synthesis',
+        role: 'Client-Side Text-to-Speech Narration Engine',
+        connected: true,
         requiresPaidKey: false,
-        status: hasApiKey ? 'Active' : 'Missing API Key',
-        capabilities: ['Storyboard Narration', 'Language Pronunciation', 'Study Audio'],
-      },
-      {
-        id: PODCAST_TTS_MODEL_NAME,
-        role: 'Dual-Speaker Study Podcast Audio Engine',
-        connected: hasApiKey,
-        requiresPaidKey: false,
-        status: hasApiKey ? 'Active' : 'Missing API Key',
-        capabilities: ['Two-Host Dialogue Audio', 'Natural Study Podcasts', 'WAV Export'],
+        status: 'Active (Browser Native)',
+        capabilities: ['Storyboard Narration', 'Language Pronunciation', 'Dual-Host Study Podcasts'],
       },
       {
         id: TRANSCRIBE_MODEL_NAME,

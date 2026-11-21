@@ -464,18 +464,8 @@ export async function runSubjectLab(params: {
   return handleJsonResponse(res);
 }
 
-export async function synthesizeSpeechTts(params: {
-  text: string;
-  style?: string;
-  voiceName?: string;
-}): Promise<{ audioBase64: string; mimeType: string }> {
-  const res = await fetch('/api/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  return handleJsonResponse(res);
-}
+// Standard text-to-speech playback uses browser window.speechSynthesis (src/utils/browserSpeech.ts).
+// Real-time bidirectional voice tutoring uses the Gemini Live API (/ws/voice-tutor).
 
 // --- Next-Generation #20-#23 API Client Functions ---
 
@@ -762,16 +752,7 @@ export async function generatePodcastScript(params: {
   return handleJsonResponse(res);
 }
 
-export async function synthesizePodcastAudio(params: {
-  turns: PodcastTurn[];
-}): Promise<{ audioBase64: string; mimeType: string; modelUsed: string }> {
-  const res = await fetch('/api/podcasts/audio', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  return handleJsonResponse(res);
-}
+// Podcast audio narration is played client-side via browser window.speechSynthesis (src/utils/browserSpeech.ts).
 
 export async function transcribeLectureToCornell(params: {
   audioFile?: File | Blob | null;
